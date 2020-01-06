@@ -1,5 +1,5 @@
 # Robot
-Robot is the Regional Cloud Infrastructure Provision Tool of CloudCIX.
+Robot is an appliance. It is the Regional Cloud Infrastructure Provisioning Tool of CloudCIX. Robot runs Ubunto 18.04 and KVM.
 
 # Minimum Hardware Requirements
   -  Single Processor Quad Core
