@@ -1,7 +1,7 @@
 # Robot
  - Robot Host is a generic name given to a virtualised physical server. Every Region POD has a Robot Server.
  - Robot is the name given to a software application running in a VM on the Robot Host. Robot is the Regional Cloud Infrastructure Provisioning Tool of CloudCIX. Robot runs on Ubuntu 20.04 and KVM.
-  - Robot Host also contains an NFS server.
+  - Robot Host also contains an NFS server which contains the ISO image files and other support files for every VM capable of being built in that Region. This NFS server is shared with all Region Hosts used for VMs.
 
 # Minimum Hardware Requirements
   -  Single Processor Quad Core
@@ -11,12 +11,12 @@
   -  1 IPMI/iDRAC/iLO Management Port
 
 # Software Requirements
-  -  Ubuntu 18.04.2 LTS (GNU/Linux 4.15.0-65-generic x86_64).
+  -  Ubuntu 20.04 LTS (GNU/Linux 4.15.0-65-generic x86_64).
   -  Docker 18.09.6, build 481bc77.
   -  Git (Ubuntu comes with git by default but still make sure git is there).
 
-# Servers Preconfiguration
-**Robothost**
+# Server Preconfiguration
+**Robot Host**
 
 1. Boot server into IPMI configuration: 
 
@@ -25,7 +25,7 @@
 *  Enable virtualisation
 *  Set LED screen regionname-robothost
 
-2. Boot server into RAID configuration and create RAID volume (redundant at least RAID1)
+2. Boot server into RAID configuration and create a RAID volume (redundant at least RAID 1)
 
 3. Start Operating System installation:
 
