@@ -1,5 +1,7 @@
 # Robot
-Robot is an appliance. It is the Regional Cloud Infrastructure Provisioning Tool of CloudCIX. Robot runs Ubunto 18.04 and KVM.
+ - Robot Host is a generic name given to a virtualised physical server. Every Region POD has a Robot Server.
+ - Robot is the name given to a software application running in a VM on the Robot Host. Robot is the Regional Cloud Infrastructure Provisioning Tool of CloudCIX. Robot runs on Ubuntu 20.04 and KVM.
+  - Robot Host also contains an NFS server.
 
 # Minimum Hardware Requirements
   -  Single Processor Quad Core
