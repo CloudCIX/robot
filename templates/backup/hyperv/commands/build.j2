@@ -1,0 +1,10 @@
+{# Build Backup #}
+$vm_name = '{{ vm_identifier }}'
+$export_path = '{{ export_path }}'
+
+mkdir $export_path
+
+$backup = Export-VM -Name $vm_name -Path $export_path -Passthru
+if ($backup){
+    Write-Output "Created VM backup"
+}

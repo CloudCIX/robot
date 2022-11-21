@@ -1,0 +1,109 @@
+# Kickstart file for VM #{{ vm_identifier }}
+
+{# System Language #}
+lang {{ language }}
+
+{# Language Modules to install #}
+langsupport {{ language }}
+
+{# System Keyboard #}
+keyboard {{ keyboard }}
+
+{# System Mouse #}
+mouse
+
+{# System Timezone #}
+timezone {{ timezone }}
+
+{# Root Password #}
+rootpw --disabled
+
+{# Username / Password #}
+user administrator --fullname "Administrator" --password {{ crypted_admin_password }} --iscrypted
+
+{# Reboot After Installation #}
+reboot
+
+{# Use text mode install #}
+text
+
+{# Install OS instead of upgrade #}
+install
+
+{# Installation Media #}
+cdrom
+
+{# System Bootloader Configuration #}
+bootloader --location=mbr
+
+{# Clear the MBR #}
+zerombr yes
+
+{# Partition Clearing Information #}
+clearpart --all --initlabel
+
+{# Basic Disk Partition #}
+part / --fstype ext4 --size 1 --grow --asprimary
+part swap --size 1024
+part /boot --fstype ext4 --size 256 --asprimary
+
+{# System Authorization Information #}
+authconfig --passalgo=sha512 --kickstart
+
+{# Network #}
+network --bootproto=static --device={{ device_type }}{{ device_index }} --ip={{ first_nic_primary['ip'] }} --netmask={{ first_nic_primary['netmask'] }} --gateway={{ first_nic_primary['gateway'] }} --nameserver="{{ dns.replace(',', ' ') }}"
+
+{# Do not configure the X Window System #}
+skipx
+
+{# Packages #}
+%packages
+openssh-server
+{% if '20' in image_filename %}
+cloud-init
+{% endif %}
+
+{# Post Install #}
+%post --nochroot
+(
+{% if netplan %}
+{# -------- Netplan --------- #}
+{% if first_nic_secondary %}
+{% set addresses = first_nic_secondary['ips'] %}
+{% set netmask = first_nic_secondary['netmask_int'] %}
+    echo -e '    {{ device_type }}{{ device_index }}:\n      addresses: [ {% for address in  addresses %}{{ address }}/{{ netmask }}, {% endfor %} ]' >> /target/etc/netplan/01-netcfg.yaml
+{% endif%}
+{% for nic in nics %}
+{% set nic_count = device_index + nic['order'] %}
+{% set addresses = nic['ips'] %}
+{% set netmask = nic['netmask_int'] %}
+    echo -e '    {{ device_type }}{{ nic_count }}:\n      addresses: [ {% for address in  addresses %}{{ address }}/{{ netmask }}, {% endfor %} ]' >> /target/etc/netplan/01-netcfg.yaml
+{% endfor %}
+    netplan apply
+
+{% else %}
+{# -------- Networks --------- #}
+{% if first_nic_secondary %}
+{% set netmask = first_nic_secondary['netmask'] %}
+{% for address in first_nic_secondary['ips'] %}
+    echo -e 'auto {{ device_type }}{{ device_index }}:{{ loop.index }}\niface {{ device_type }}{{ device_index }}:{{ loop.index }} inet static\n    address {{ address }}\n    netmask {{ netmask }}\n' >> /target/etc/network/interfaces;
+{% endfor %}
+{% endif%}
+{% for nic in nics %}
+{% set nic_count = device_index + nic['order'] %}
+{% for address in nic['ips'] %}
+    echo -e 'auto {{ device_type }}{{ nic_count }}\niface {{ device_type }}{{ nic_count }} inet static\n    address {{ address }}\n    netmask {{ nic['netmask'] }}\n' >> /target/etc/network/interfaces;
+{% endfor %}
+{% endfor %}
+
+{% endif %}
+
+{# ------ SSH public key authentication ----- #}
+{% if ssh_public_key %}
+mkdir -m0700 -p /target/home/administrator/.ssh
+cat <<EOF >/target/home/administrator/.ssh/authorized_keys "{{ ssh_public_key }}"
+chmod 0600 /target/home/administrator/.ssh/authorized_keys
+{% endif %}
+
+) 1> /target/root/post_install.log 2>&1
+%end

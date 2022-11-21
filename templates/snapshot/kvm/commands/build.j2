@@ -1,0 +1,2 @@
+{# Create the snapshot #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh snapshot-create-as --domain {{ vm_identifier }} --name {{snapshot_identifier}}

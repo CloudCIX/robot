@@ -1,0 +1,13 @@
+try {
+  # Set the script to stop at the first error
+  $ErrorActionPreference = "Stop"
+  $VMName = "{{ vm_identifier }}"
+  Get-VMHardDiskDrive -VMName $VMName | foreach {
+    Remove-Item -Path $_.Path -Recurse -Force -Confirm:$false
+  }
+  Remove-VM -Name $VMName -Force
+  Remove-Item -Recurse {{ vms_path }}$VMName
+  Write-Host "$VMName Successfully Deleted."
+} catch {
+  Write-Error "VM failed to delete. Error Message: $_.Exception.Message"
+}

@@ -1,0 +1,21 @@
+{# netplan definition for a VLAN bridge in KVM hosts #}
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    cloud0: {}
+  bridges:
+    br{{ vlan }}:
+      dhcp4: no
+      dhcp6: no
+      interfaces: [ cloud0.{{ vlan }} ]
+      parameters:
+        forward-delay: 0
+        stp: false
+  vlans:
+    cloud0.{{ vlan }}:
+      dhcp4: no
+      dhcp6: no
+      accept-ra: no
+      id: {{ vlan }}
+      link: cloud0

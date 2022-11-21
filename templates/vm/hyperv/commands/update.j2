@@ -1,0 +1,36 @@
+try {
+  $ErrorActionPreference = "Stop"
+  $VMName = "{{ vm_identifier }}"
+{# 1. Shutdown the VM first #}
+  Stop-VM -Name $VMName
+{# 2. Updates the processor/cpu count and Ram sizes even if changed or not #}
+{% if changes['cpu'] %}
+  Set-VMProcessor $VMName -Count {{ changes['cpu'] }}
+{% endif %}
+{% if changes['ram'] %}
+  Set-VMMemory $VMName -DynamicMemoryEnabled $false -StartupBytes {{ changes['ram'] }}MB
+{% endif %}
+{# 3. Update Drive Sizes #}
+{% if changes['storages'] %}
+{% set drives = changes['storages'] %}
+{% for drive in drives %}
+{# considering new_size > old_size always #}
+{% if int(drive["new_size"]) > int(drive["old_size"]) %}
+  $vhdxPath = {{ vms_path }}$VMName\$VMName_{{ storage_type }}_{{ drive["id"] }}.vhdx
+  Resize-VHD -Path $vhdxPath -SizeBytes {{ drive["new_size"] }}GB
+  $mountedVHD = Mount-VHD -Path $vhdxPath -NoDriveLetter -Passthru
+  Set-Disk -Number $mountedVHD.Number -IsOffline $false
+  $partitions = Get-Partition -DiskNumber $mountedVHD.Number
+  $size = Get-PartitionSupportedSize -DiskNumber $mountedVHD.Number
+  Resize-Partition -DiskNumber $mountedVHD.Number -PartitionNumber $partitions[-1].PartitionNumber -Size $size.SizeMax
+  Dismount-VHD -Path $vhdxPath
+{% elif int(drive["new_size"]) == 0 %}
+  Remove-Item -Recurse {{ vms_path }}$VMName\$VMName_{{ storage_type }}_{{ drive["id"] }}.vhdx
+{% elif drive["old_size"] is in ["0", None, ""] %}
+  New-VHD -Path {{ vms_path }}$VMName\$VMName_{{ storage_type }}_{{ drive["id"] }}.vhdx -SizeBytes {{ drive["new_size"] }}GB -Dynamic
+  Add-VMHardDiskDrive -VMName $VMName -Path {{ vms_path }}$VMName\$VMName_{{ storage_type }}_{{ drive["id"] }}.vhdx
+{% endif %}
+{% endfor %}
+{% endif %}
+  Write-Host "VM Successfully Updated."
+}catch {Write-Error "VM failed to update. Error Message: $_.Exception.Message"}

@@ -1,0 +1,2 @@
+{# Power on a shut down VM #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh start {{ vm_identifier }}

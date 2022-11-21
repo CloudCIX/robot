@@ -1,0 +1,2 @@
+{# Apply the snapshot #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh snapshot-revert --domain {{ vm_identifier }} --snapshotname {{snapshot_identifier}}

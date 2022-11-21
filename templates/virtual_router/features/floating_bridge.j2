@@ -1,0 +1,16 @@
+# netplan definition for a Floating subnet bridge for Project namespaces
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ public_interface }}: {}
+
+  bridges:
+    br-B{{ ipv4_floating_subnet_id }}:
+      dhcp4: no
+      dhcp6: no
+      accept-ra: no
+      addresses: [ {{ virtual_router_gateway }}/{{ virtual_router_subnet_mask }} ]
+      parameters:
+        forward-delay: 0
+        stp: true

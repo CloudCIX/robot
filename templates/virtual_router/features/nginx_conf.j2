@@ -1,0 +1,10 @@
+user www-data;
+events {}
+http {
+    server {
+        listen 80;
+        location / {
+            root {{ content_dir }}/$remote_addr;
+        }
+    }
+}

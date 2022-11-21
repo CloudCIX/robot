@@ -1,0 +1,95 @@
+function VMBuilder {
+  [cmdletbinding()]
+  Param(
+    [string]$drive_letter,
+    [string]$mount_point
+  )
+  try {
+    $file_path = "$drive_letter\HyperV\"
+    if($(Test-Path -Path $file_path) -eq $True){
+{# Define Ram #}
+    $ram = [int64]{{ ram }}*1MB
+{# Define primary drive #}
+{% set vars = {'storage_id': 0} %}
+{% for storage in storages %}
+  {% if storage["primary"] %}
+    {% if vars.update({'storage_id': storage["id"]}) %}{% endif %}
+    $storage_size = [int64]{{ storage["gb"] }}*1GB
+  {% endif %}
+{% endfor %}
+{# Path Configuration #}
+{# VM Path #}
+{% set vm_path = "D:\HyperV\\" %}
+    New-Item -ItemType directory -Path {{ vm_path }}{{ vm_identifier }}
+{# VHDX Path #}
+{% set vhd_path = [[[[vm_path, vm_identifier]|join(), vm_identifier]|join("\\"), storage_type, vars.storage_id]|join("_"), ".vhdx"]|join() %}
+{# IMAGE VHDX Path #}
+    [ValidateScript({Test-Path $_ })]
+    [string]$VHDXPath = "$drive_letter\HyperV\VHDXs\{{ image_filename }}"
+{# Unattend XML file path #}
+    [ValidateScript({Test-Path $_ })]
+    $unattend = "$drive_letter\HyperV\VMs\{{ vm_identifier }}\unattend.xml"
+    $network = "$drive_letter\HyperV\VMs\{{ vm_identifier }}\network.xml"
+{# Copying VHDX to the folder #}
+    Copy-Item $VHDXPath -Destination {{ vhd_path }}
+{# Resizing the drive  #}
+    Resize-VHD -Path {{ vhd_path }} -SizeBytes $storage_size
+{# Mounting the drive #}
+    $mountedVHD = Mount-VHD -Path {{ vhd_path }} -NoDriveLetter -Passthru
+    Set-Disk -Number $mountedVHD.Number -IsOffline $false
+    $partitions = Get-Partition -DiskNumber $mountedVHD.Number
+    $mount_path = "D:\HyperV\{{ vm_identifier }}\mount"
+    mkdir $mount_path
+    Add-PartitionAccessPath -InputObject $partitions[-1] -AccessPath $mount_path
+{# Copying unattend and network xml files into mounded drive #}
+    Copy-Item $unattend "$mount_path\unattend.xml"
+    Copy-Item $network "$mount_path\network.xml"
+{# Expanding the VHDx drive to its requested size #}
+    [System.UInt64]$size = (Get-PartitionSupportedSize -DiskNumber $mountedVHD.Number -PartitionNumber $partitions[-1].PartitionNumber).SizeMax
+    Resize-Partition -DiskNumber $mountedVHD.Number -PartitionNumber $partitions[-1].PartitionNumber -Size $size
+    Remove-Item -Path $mount_path -Recurse -Force
+    Dismount-VHD -Path {{ vhd_path }}
+{# VM Creation and Configuration #}
+{# Creation of VM #}
+    New-VM -Name {{ vm_identifier }} -Path {{ vm_path }} `
+    -Generation 2 `
+    -SwitchName "Virtual Switch" `
+    -VHDPath {{ vhd_path }}
+{# Changing the number of processor and the memory #}
+    Set-VMProcessor {{ vm_identifier }} -Count {{ cpu }}
+{# Setting the RAM #}
+    Set-VMMemory {{ vm_identifier }} -DynamicMemoryEnabled $false -StartupBytes $ram
+{# Setting Network Adapter #}
+    Remove-VMNetworkAdapter -VMName {{ vm_identifier }}
+{% for vlan in vlans %}
+    Add-VMNetworkAdapter -VMName {{ vm_identifier }} -Name "vNIC-{{ vlan }}" -SwitchName "Virtual Switch" -DeviceNaming On
+    Set-VMNetworkAdapterVlan -VMName {{ vm_identifier }} -VMNetworkAdapterName "vNIC-{{ vlan }}" -Access -VlanId {{ vlan }}
+{% endfor %}
+{# Adding Additional Storages #}
+{% for storage in storages %}
+{% if not storage["primary"] %}
+    $driveSize = [int64]{{ storage["gb"] }}*1GB
+{% set drive_path = [[[[vms_path, vm_identifier]|join(), vm_identifier]|join("\\"), storage_type, storage["id"]]|join("_"), ".vhdx"]|join() %}
+{# Create new drive #}
+    New-VHD -Path {{ drive_path }} -SizeBytes $driveSize -Dynamic
+{# Attach the VHD(x) to the Vm #}
+    Add-VMHardDiskDrive -VMName {{ vm_identifier }} -Path {{ drive_path }}
+{% endif %}
+{% endfor %}
+{# Start the VM #}
+    Start-VM -Name {{ vm_identifier }}
+    Wait-VM -Name {{ vm_identifier }} -For IPAddress
+    Write-Host "VM Successfully Created and Hosted"
+    }
+  else {
+    Write-Error "$_.Exception.Message"
+  }
+  }
+  catch {
+    if($(Test-Path -Path D:\HyperV\{{ vm_identifier }}\mount\Windows)){
+    Dismount-VHD -Path {{ vhd_path }}}
+    if($(Test-Path -Path D:\HyperV\{{ vm_identifier }}) -eq $True){
+    Remove-Item -Path D:\HyperV\{{ vm_identifier }} -Recurse -Force}
+    Write-Error "$_.Exception.Message "
+  }
+}

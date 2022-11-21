@@ -1,0 +1,14 @@
+Celery>=4,<5
+cloudcix
+git+https://github.com/CloudCIX/python-logstash-async.git
+git+https://github.com/CloudCIX/metrics.git
+git+https://github.com/diyan/pywinrm.git@3bf4ab094761a861563fc1df1d4b44134147c206
+# 'EntryPoints' object has no attribute 'get' - Endpoint deprecated in importlib-metadata v5
+importlib-metadata==4.13.0
+influxdb
+jaeger-client
+jinja2
+netaddr
+paramiko
+# supervisor for running multiple processes once
+supervisor

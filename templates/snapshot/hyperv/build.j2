@@ -1,0 +1,16 @@
+{# Build Snapshot #}
+function SnapshotIsValid{
+    $snapshot = Get-VMSnapshot -VMName $vm_name -Name $snapshot_name -ea SilentlyContinue
+    if ($snapshot) {
+        return $true
+    }
+    return $false
+}
+$snapshot_name = "{{ snapshot_identifier }}"
+$vm_name = "{{ vm_identifier }}"
+
+Set-VM -Name $vm_name -CheckpointType Standard
+Checkpoint-VM -Name $vm_name -SnapshotName $snapshot_name -ErrorAction Stop
+if(SnapshotIsValid){
+    Write-Output "successfully created snapshot"
+}
