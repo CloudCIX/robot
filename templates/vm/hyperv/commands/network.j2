@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Network>
+    <NetAdapters>
+{% for default_ip in default_ips %}
+{% if loop.index == 1 %}
+        <NetAdapter Name="vNIC-{{ default_vlan }}" IP="{{ default_ip }}" Netmask="{{ default_netmask_int }}" GW="{{ default_gateway }}" DNS="{{ dns }}" RegisterDNS="1" />
+{% else %}
+        <NetAdapter Name="vNIC-{{ default_vlan }}" IP="{{ default_ip }}" Netmask="{{ default_netmask_int }}" GW="" DNS="{{ dns }}" RegisterDNS="1" />
+{% endif %}
+{% endfor %}
+{% for ip in ip_addresses %}
+{% for address in ip['ips'] %}
+        <NetAdapter Name="vNIC-{{ ip['vlan'] }}" IP="{{ address }}" Netmask="{{ ip['netmask_int'] }}" GW="" DNS="{{ dns }}" RegisterDNS="1" />
+{% endfor %}
+{% endfor %}
+    </NetAdapters>
+</Network>

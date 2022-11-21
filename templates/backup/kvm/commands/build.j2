@@ -1,0 +1,90 @@
+{# Create Backup #}
+DOMAIN='{{ vm_identifier }}'
+export_path='{{ export_path }}'
+
+BREAK=false
+
+        echo "---- VM Backup start $DOMAIN ---- $(date +'%d-%m-%Y %H:%M:%S')"
+
+        BACKUPFOLDER=$export_path/$DOMAIN
+        [ ! -d $BACKUPFOLDER ] && mkdir -p $BACKUPFOLDER
+        TARGETS=$(echo '{{ host_sudo_passwd }}' | sudo -S virsh domblklist $DOMAIN --details | grep disk | awk '{print $3}')
+        IMAGES=$(echo '{{ host_sudo_passwd }}' | sudo -S virsh domblklist $DOMAIN --details | grep disk | awk '{print $4}')
+
+        # check to make sure the VM is running on a standard image, not
+        # a snapshot that may be from a backup that previously failed
+        for IMAGE in $IMAGES; do
+                if [[ $IMAGE == *"snaptemp"* ]]; then
+                        >&2 echo "$Error VM $DOMAIN is running on a snapshot disk image: $IMAGE"
+                        BREAK=true
+                        break
+                fi
+        done
+        [ $BREAK == true ] && continue
+
+        # gather all the disks being used by the VM so they can be collectively snapshotted
+        DISKSPEC=""
+        for TARGET in $TARGETS; do
+                if [[ $TARGET == *"snaptemp"* ]]; then
+                        >&2 echo "$Error VM $DOMAIN is running on a snapshot disk image: $TARGET"
+                        BREAK=true
+                        break
+                fi
+                DISKSPEC="$DISKSPEC --diskspec $TARGET,snapshot=external"
+        done
+        [ $BREAK == true ] && continue
+
+        # transfer the VM to snapshot disk image(s)
+        CMD="echo '{{ host_sudo_passwd }}' | sudo -S virsh snapshot-create-as --domain $DOMAIN --name snaptemp --no-metadata --atomic --disk-only $DISKSPEC"
+        echo "Command: $CMD"
+        eval "$CMD"
+        if [ $? -ne 0 ]; then
+                >&2 echo "Failed to create snapshot for $DOMAIN"
+                exit
+        fi
+
+        # copy/back/compress the VM's disk image(s)
+        for IMAGE in $IMAGES; do
+                echo "Copying $IMAGE to $BACKUPFOLDER"
+                BACKUP_FILE="$BACKUPFOLDER/"
+                CMD="echo '{{ host_sudo_passwd }}' | sudo -S cp $IMAGE $BACKUP_FILE"
+                echo "Command: $CMD"
+                SECS=$(printf "%.0f" $(/usr/bin/time -f %e sh -c "$CMD"))
+                printf '%s%dh:%dm:%ds\n' "Duration: " $(($SECS/3600)) $(($SECS%3600/60)) $(($SECS%60))
+                BYTES=$(stat -c %s $IMAGE)
+                printf "%s%'d\n" "Source MB: " $(($BYTES/1024/1024))
+                eval "$CMD"
+        done
+
+        # Update the VM's disk image(s) with any changes recorded in the snapshot
+        # while the copy process was running.  In qemu lingo this is called a "pivot"
+        BACKUPIMAGES=$(echo '{{ host_sudo_passwd }}' | sudo -S virsh domblklist $DOMAIN --details | grep disk | awk '{print $4}')
+        for TARGET in $TARGETS; do
+                CMD="echo '{{ host_sudo_passwd }}' | sudo -S virsh blockcommit $DOMAIN $TARGET --active --pivot"
+                echo "Command: $CMD"
+                eval "$CMD"
+
+                if [ $? -ne 0 ]; then
+                        >&2 echo "Could not merge changes for disk of $TARGET of $DOMAIN. VM may be in an invalid state."
+                        BREAK=true
+                        break
+                fi
+        done
+        [ $BREAK == true ] && continue
+
+        # Now that the VM's disk image(s) have been successfully committed/pivoted to
+        # back to the main disk image, remove the temporary snapshot image file(s)
+        for BACKUP in $BACKUPIMAGES; do
+                if [[ $BACKUP == *"snaptemp"* ]]; then
+                        CMD="echo '{{ host_sudo_passwd }}' | sudo -S rm -f $BACKUP"
+                        echo " Deleting temporary image $BACKUP"
+                        echo "Command: $CMD"
+                        eval "$CMD"
+                fi
+        done
+
+        # capture the VM's definition in use at the time the backup was done
+        CMD="echo '{{ host_sudo_passwd }}' | sudo -S virsh dumpxml $DOMAIN > $BACKUPFOLDER/$DOMAIN.xml"
+        echo "Command: $CMD"
+        eval "$CMD"
+        echo "---- Backup done $DOMAIN ---- $(date +'%d-%m-%Y %H:%M:%S') ----"

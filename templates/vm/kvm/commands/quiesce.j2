@@ -1,0 +1,2 @@
+{# shutting down the VM #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh shutdown {{ vm_identifier }}

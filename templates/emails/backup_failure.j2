@@ -1,0 +1,14 @@
+{% extends "emails/base.j2" %}
+{# A general failure email to be sent to the NOC #}
+
+{% block title %}An error occurred while processing Backup #{{ id }}.{% endblock %}
+
+{% block content %}
+<p>Task: <em>{{ task }}</em></p>
+<hr />
+<p>Exception:</p>
+<pre><code>{{ errors }}</code></pre>
+<hr />
+<p>Below is the data that was involved in the error.</p>
+<pre><code>{{ data }}</code></pre>
+{% endblock %}

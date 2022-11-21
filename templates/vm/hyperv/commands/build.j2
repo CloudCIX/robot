@@ -1,0 +1,24 @@
+{# Set the script to stop at the first error. #}
+$ErrorActionPreference = "Stop"
+$mount_point = "drive_{{ vm_identifier }}"
+$drive_letter = $mount_point+":"
+try {
+  New-PSDrive -Name $mount_point -PSProvider FileSystem `
+  -Root {{ network_drive_url }} -Scope Global
+}
+catch {
+  Write-Error "Failed to mount Network drive while running vm build cmd. Details: $_"
+}
+try {
+  [ValidateScript({Test-Path $_ })]
+  $build = "$drive_letter\HyperV\VMs\{{ vm_identifier }}\builder.psm1"
+}
+catch {
+  Write-Error "builder.psm1 file not found for vm {{ vm_identifier }}, exiting the VM Build. Details: $_"
+}
+{# Import and call builder script #}
+Import-Module $build
+VMBuilder -drive_letter $drive_letter -mount_point $mount_point
+if($(Test-Path -Path $drive_letter) -eq $True){
+Remove-PSDrive $mount_point
+}

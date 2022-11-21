@@ -1,0 +1,105 @@
+#!/usr/sbin/nft -f
+
+# Flush the rule set
+flush ruleset
+
+table inet filter {
+    chain global {
+        ct state established,related accept
+    }
+    chain icmp_allow {
+        icmp type { echo-reply, destination-unreachable, echo-request, time-exceeded } accept
+        icmpv6 type { echo-request, mld-listener-query, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } accept
+    }
+
+    # inbound NAT 1:1
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+{% for nat in nats %}
+        iifname "P{{ project_id }}.B{{ ipv4_floating_subnet_id }}" ip daddr {{ nat['public_address']}} dnat to {{ nat['private_address']}}
+{% endfor %}
+    }
+
+    # outbound NAT of VMs and VRF_ip
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        # VMs static NAT
+{% for nat in nats %}
+        oifname "P{{ project_id }}.B{{ ipv4_floating_subnet_id }}" ip saddr {{ nat['private_address']}} snat to {{ nat['public_address']}}
+{% endfor %}
+
+        # Rest outbound over virtual router ip
+{% for subnet in local_subnets %}
+        oifname "P{{ project_id }}.B{{ ipv4_floating_subnet_id }}" ip saddr {{ subnet['address_range'] }} snat to {{ virtual_router_ip }}
+{% endfor %}
+    }
+
+    # block all access to namespace
+    chain input {
+        type filter hook input priority filter; policy drop;
+        jump global
+        jump icmp_allow
+        # DNS needs to be allowed
+        meta l4proto { tcp, udp } th dport {53, 500} accept
+    }
+
+    # supporting chains for forward chain and itself
+    chain forward_inbound {
+{% for rule in inbound_firewall_rules %}
+{% if rule['allow'] %}
+        # default all inbound should be blocked but users can add their own inbound allow rules
+{% if rule['protocol'] == 'any' %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} accept
+{% elif rule['protocol'] == 'icmp' %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} jump icmp_allow
+{% else %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} {{ rule['protocol'] }} dport {{ rule['port'] }} accept
+{% endif %}
+
+{% endif %}
+{% endfor %}
+        # Default inbound drop is in main chain default policy
+    }
+    chain forward_outbound {
+{% for rule in outbound_firewall_rules %}
+{% if not rule['allow'] %}
+        # default all outbound should be allowed but users can add their own outbound block rules
+{% if rule['protocol'] == 'any' %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} drop
+{% elif rule['protocol'] == 'icmp' %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} drop
+{% else %}
+        ip saddr {{ rule['source'] }} ip daddr {{ rule['destination'] }} {{ rule['protocol'] }} dport {{ rule['port'] }} drop
+{% endif %}
+
+{% endif %}
+{% endfor %}
+        # Default outboud allow all
+        accept
+    }
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+        jump global
+
+        # DNS needs to be allowed
+        meta l4proto { tcp, udp } th dport 53 accept
+
+{% for vpn in vpns %}
+        # For VPN {{ vpn['id'] }}
+{% for route in vpn['routes'] %}
+        ip saddr { {{ route['local'] }}, {{ route['remote'] }}  } ip daddr { {{ route['local'] }}, {{ route['remote'] }} } accept
+{% endfor %}
+{% endfor %}
+
+        # project inbound
+        iifname "P{{ project_id }}.B{{ ipv4_floating_subnet_id }}" jump forward_inbound
+
+        # project outbound
+        oifname "P{{ project_id }}.B{{ ipv4_floating_subnet_id }}" jump forward_outbound
+    }
+
+    # allow all out bound access from namespace
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

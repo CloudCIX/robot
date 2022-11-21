@@ -1,0 +1,95 @@
+# Kickstart file for VM #{{ vm_identifier }}
+
+{# Install OS instead of upgrade #}
+install
+
+{# Installation media #}
+cdrom
+
+{# System Language #}
+lang {{ language }}.UTF-8
+
+{# System Keyboard #}
+keyboard {{ keyboard }}
+
+{# Firewall configuration #}
+firewall --disabled
+
+{# Run the setup agent on the first boot #}
+firstboot --disabled
+
+{# System Timezone #}
+timezone --utc {{ timezone }}
+
+{# Use text mode install #}
+text
+
+{# System Authorization Information #}
+auth{{ auth }} --enableshadow --passalgo=sha512
+
+{# Clear the MBR #}
+zerombr
+
+{# Partition Clearing Information #}
+clearpart --all --initlabel
+
+{# Installation log level #}
+logging --level=info
+
+{# Network Information #}
+network --bootproto=static --device={{ device_type }}{{ device_index }} --ip={{ first_nic_primary['ip'] }} --netmask={{ first_nic_primary['netmask'] }} --gateway={{ first_nic_primary['gateway'] }} --nameserver={{ dns }} --activate
+{% for nic in nics %}
+{% set nic_count = device_index + nic['order'] %}
+{% set address = nic['ips'].pop(0) %}
+network --bootproto=static --device={{ device_type }}{{ nic_count}} --ip={{ address }} --netmask={{ nic['netmask'] }} --gateway={{ nic['gateway'] }} --nameserver={{ dns }} --activate
+{% endfor %}
+
+{# System Bootloader information #}
+bootloader --location=mbr
+
+{# Disk Partioning #}
+autopart --type=lvm
+
+{# Root password #}
+rootpw --iscrypted {{ crypted_root_password }}
+
+{# Username / Password #}
+user --name "administrator" --password={{ crypted_admin_password }} --groups=wheel --iscrypted
+
+{# SELinux configuration #}
+selinux --disabled
+
+{# Do not configure the X Window System #}
+skipx
+
+{# Reboot after installation #}
+reboot --eject
+
+{# Install packages #}
+%packages
+@core
+%end
+
+{# Post Install #}
+%post --log=/root/install-post.log
+{# Multiple interface config #}
+{% if first_nic_secondary %}
+{% for address in first_nic_secondary['ips'] %}
+    echo -e "IPADDR{{ loop.index + 1 }}={{ address }}\nPREFIX{{ loop.index + 1 }}={{ first_nic_secondary['netmask_int'] }}" >> /etc/sysconfig/network-scripts/ifcfg-{{ device_type }}{{ device_index }}
+{% endfor %}
+{% endif%}
+
+{% for nic in nics %}
+{% set nic_count = device_index + nic['order'] %}
+{% for address in nic['ips'] %}
+    echo -e "IPADDR{{ loop.index + 1 }}={{ address }}\nPREFIX{{ loop.index + 1 }}={{ nic['netmask_int'] }}" >> /etc/sysconfig/network-scripts/ifcfg-{{ device_type }}{{ nic_count }}
+{% endfor %}
+{% endfor %}
+
+{# SSH public key authentication #}
+{% if ssh_public_key %}
+mkdir -m0700 -p /home/administrator/.ssh
+cat <<EOF >/home/administrator/.ssh/authorized_keys "{{ ssh_public_key }}"
+chmod 0600 /home/administrator/.ssh/authorized_keys
+{% endif %}
+%end

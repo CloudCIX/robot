@@ -1,0 +1,68 @@
+{% extends "emails/base.j2" %}
+
+{% block title %}Your VPN Tunnel(s) {% if build %}built{% else %}updated{% endif %} successfully!{% endblock %}
+
+{% block content %}
+<p>You are receiving this email because you requested for a VPN to be built.</p>
+<p>You must now configure the VPN on your hardware following the instructions below, in order to connect.</p>
+<hr />
+<h3>Step 1</h3>
+<p>Before connecting to a VPN Tunnel, ensure that your Project is reachable.</p>
+<p>You can check this by pinging the Virtual Router of the Project at <b>{{ virtual_router_ip }}</b>.</p>
+<hr />
+{% if vpn_type == 'site_to_site' %}
+<h3>Step 2</h3>
+<p>After ensuring the Project is accessible, configure the VPN settings on your local router with the settings in the table below.</p>
+<hr />
+<h3>Step 3</h3>
+<p>After configuring the VPN on your local hardware, test that it works by pinging the gateway of a Project Subnet;</p>
+<hr />
+<h2>{{ description }} VPN Configuration</h2>
+<table class="align-left">
+  {# Addresses #}
+  <tr><th colspan="2" class="align-center" style="font-size:1.5em;">IPAddress Details</th></tr>
+  <tr><th>Customer Router Gateway</th><td>{{ ike_gateway_value }}</td></tr>
+  <tr><th>Project Router Address</th><td>{{ podnet_cpe }}</td></tr>
+  {# Traffic selectors or Proxy ids #}
+{% if traffic_selector %}
+  <tr><th colspan="2" class="align-center" style="padding-top:1em;font-size:1.5em;">Traffic-Selector/Proxy-ID settings</th></tr>
+  <tr><th class="c1"> Project side</th><th class="c2"> Customer side</th></tr>
+{% for route in routes %}
+  <tr><td class="c1">{{ route['local'] }}</td><td class="c2">{{ route['remote'] }}</td></tr>
+{% endfor %}
+{% endif %}
+  {# IKE Settings #}
+  <tr><th colspan="2" class="align-center" style="padding-top:1em;font-size:1.5em;">IKE (Phase 1) Settings</th></tr>
+  <tr><th>Authentication</th><td>{{ ike_authentication }}</td></tr>
+  <tr><th>Diffie-Hellman (DH) Group</th><td>{{ ike_dh_groups }}</td></tr>
+  <tr><th>Encryption</th><td>{{ ike_encryption }}</td></tr>
+  <tr><th>IKE Version</th><td>{{ ike_version }}</td></tr>
+  <tr><th>Lifetime (in seconds)</th><td>{{ ike_lifetime }}</td></tr>
+  <tr><th>Mode</th><td>{{ ike_mode }}</td></tr>
+  <tr><th>Pre Shared Key</th><td>{{ ike_pre_shared_key }}</td></tr>
+  {# IPSec Settings #}
+  <tr><th colspan="2" class="align-center" style="padding-top:1em;font-size:1.5em;">IPSec (Phase 2) Settings</th></tr>
+  <tr><th>Authentication</th><td>{{ ipsec_authentication }}</td></tr>
+  <tr><th>Encapsulation Mode</th><td>Tunnel</td></tr>
+  <tr><th>Establish Tunnel</th><td>{{ ipsec_establish_time }}</td></tr>
+  <tr><th>Encryption</th><td>{{ ipsec_encryption }}</td></tr>
+  <tr><th>Lifetime (in seconds)</th><td>{{ ipsec_lifetime }}</td></tr>
+  <tr><th>PFS Group</th><td>{{ ipsec_pfs_groups }}</td></tr>
+  <tr><th>Protocol</th><td>esp</td></tr>
+</table>
+{% endif %}
+{% if vpn_type == 'dynamic_secure_connect' %}
+<h3>Step 2</h3>
+<p>After ensuring the Project is accessible, You need to have downloaded and installed Juniper Secure Connect Client on your machine.</p>
+<p>Downloads are at [Juniper Secure Connect](https://apps.juniper.net/home/juniper-secure-connect/support)</p>
+<hr />
+<h3>Step 3</h3>
+<p>Open Juniper Secure Client program and supply following information</p>
+<table class="align-left">
+  <tr><th>Connection Profile</th><td>New Connection</td></tr>
+  <tr><th>Gateway Address</th><td>{{ srx_vpn_name }}</td></tr>
+</table>
+<p>Click on `Connection` and supply your username and password. </p>
+<hr />
+{% endif %}
+{% endblock %}

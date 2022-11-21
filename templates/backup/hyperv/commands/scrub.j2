@@ -1,0 +1,8 @@
+{# Scrub Backup #}
+$export_path = '{{ export_path }}'
+Remove-Item $export_path  -Recurse
+
+$backup = Test-Path -Path $export_path
+if (-Not $backup) {
+    Write-Output "Ran remove backup command"
+}

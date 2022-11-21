@@ -1,0 +1,8 @@
+{# Delete the snapshot #}
+remove_subtree={{ remove_subtree}}
+if [ $remove_subtree == True ]
+then
+        echo '{{ host_sudo_passwd }}' | sudo -S virsh snapshot-delete --domain {{ vm_identifier }} --snapshotname {{snapshot_identifier}} --children
+else
+        echo '{{ host_sudo_passwd }}' | sudo -S virsh snapshot-delete --domain {{ vm_identifier }} --snapshotname {{snapshot_identifier}}
+fi

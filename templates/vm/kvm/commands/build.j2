@@ -1,0 +1,33 @@
+{
+{#----------------------- Storage creation------------------------- #}
+{% for storage in storages %}
+  echo '{{ host_sudo_passwd }}' | sudo -S qemu-img create -f qcow2 {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ storage["id"] }}.img {{ storage["gb"] }}G
+{% endfor %}
+
+{#----------------------- VM creation------------------------- #}
+  echo '{{ host_sudo_passwd }}' | sudo -S virt-install --name {{ vm_identifier }} \
+  --memory {{ ram }} \
+  --vcpus {{ cpu }} \
+{# Primary storage first #}
+{% for storage in storages %}
+  {% if storage["primary"] %}
+  --disk path="{{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ storage["id"] }}.img,device=disk,bus=virtio" \
+  {% endif %}
+{% endfor %}
+{% for storage in storages %}
+  {% if not storage["primary"] %}
+  --disk path="{{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ storage["id"] }}.img,device=disk,bus=virtio" \
+  {% endif %}
+{% endfor %}
+  --graphics vnc \
+  --location {{ network_drive_path }}/ISOs/{{ image_filename }} \
+  --os-variant generic \
+  --initrd-inject={{ network_drive_path }}/VMs/{{ vm_identifier }}/{{ vm_identifier }}.cfg -x "ks=file:/{{ vm_identifier }}.cfg" \
+  --network bridge=br{{ first_nic_primary['vlan'] }},model=virtio --extra-args="netcfg/choose_interface={{ device_type }}{{ device_index }}" \
+{% for vlan in vlans %}
+  {% if vlan != first_nic_primary['vlan'] %}
+  --network bridge=br{{ vlan }},model=virtio \
+  {% endif %}
+{% endfor %}
+--autostart
+}

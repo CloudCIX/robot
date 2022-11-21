@@ -1,0 +1,72 @@
+{# Project Config #}
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# Project namespace #}
+sudo ip netns add P{{ project_id }}
+sudo ip netns exec P{{ project_id }} ip link set dev lo up
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# connection between Floating Subnet bridge and Project namespace #}
+sudo ip link add B{{ ipv4_floating_subnet_id }}.P{{ project_id }} type veth peer name P{{ project_id }}.B{{ ipv4_floating_subnet_id }}
+sudo ip link set B{{ ipv4_floating_subnet_id }}.P{{ project_id }} master br-B{{ ipv4_floating_subnet_id }}
+sudo ip link set dev B{{ ipv4_floating_subnet_id }}.P{{ project_id }} up
+sudo ip link set P{{ project_id }}.B{{ ipv4_floating_subnet_id }} netns P{{ project_id }}
+sudo ip netns exec P{{ project_id }} ip addr add {{ virtual_router_ip }}/{{ virtual_router_subnet_mask }} dev P{{ project_id }}.B{{ ipv4_floating_subnet_id }}
+sudo ip netns exec P{{ project_id }} ip link set dev P{{ project_id }}.B{{ ipv4_floating_subnet_id }} up
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# outbound route for IPv4 #}
+sudo ip netns exec P{{ project_id }} ip route add default via {{ virtual_router_gateway }}
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# 1:1 nat ips defination on namespace #}
+{% for nat in nats %}
+sudo ip netns exec P{{ project_id }} ip addr add {{ nat['public_address'] }}/{{ virtual_router_subnet_mask }} dev P{{ project_id }}.B{{ ipv4_floating_subnet_id }}
+{% endfor %}
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# create Project Network bridges #}
+{% for vlan in vlans %}
+sudo ip link add name br-B{{ vlan['vlan'] }} type bridge
+sudo ip link set br-B{{ vlan['vlan'] }} up
+
+{# add network gateway interface on namespace and connect to network bridge #}
+sudo ip link add P{{ project_id }}.B{{ vlan['vlan'] }} type veth peer name B{{ vlan['vlan'] }}.P{{ project_id }}
+sudo ip link set P{{ project_id }}.B{{ vlan['vlan'] }} netns P{{ project_id }}
+sudo ip link set B{{ vlan['vlan'] }}.P{{ project_id }} master br-B{{ vlan['vlan'] }}
+sudo ip link set dev B{{ vlan['vlan'] }}.P{{ project_id }} up
+sudo ip netns exec P{{ project_id }} ip addr add {{ vlan['address_range'] }} dev P{{ project_id }}.B{{ vlan['vlan'] }}
+sudo ip netns exec P{{ project_id }} ip link set dev P{{ project_id }}.B{{ vlan['vlan'] }} up
+
+{# create vlan for private interface and connect to project network bridge #}
+sudo ip link add link {{ private_interface }} name {{ private_interface }}.{{ vlan['vlan'] }} type vlan id {{ vlan['vlan'] }}
+sudo ip link set dev {{ private_interface }}.{{ vlan['vlan'] }} master br-B{{ vlan['vlan'] }}
+sudo ip link set dev {{ private_interface }}.{{ vlan['vlan'] }} up
+{% endfor %}
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# enabling route forwarding #}
+sudo ip netns exec P{{ project_id }} sysctl -w net.ipv4.ip_forward=1
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# Apply Firewall rules #}
+sudo ip netns exec P{{ project_id }} nft -f {{ remote_path }}{{ firewall_filename }}
+sudo rm {{ remote_path }}{{ firewall_filename }}
+{# ------------------------------------------------------------------------------------------------------------- #}
+{# VPNs interface creation and linking to namespace #}
+{% if vpns|length > 0 %}
+{% for vpn in vpns %}
+{# xfrm interface for S2S VPN #}
+sudo ip link add xfrm{{ vpn['stif_number'] }} type xfrm dev {{ public_interface }} if_id {{ vpn['stif_number'] }}
+sudo sysctl -w net.ipv4.conf.xfrm{{ vpn['stif_number'] }}.disable_policy=1
+sudo ip link set xfrm{{ vpn['stif_number'] }} netns P{{ project_id }}
+sudo ip netns exec P{{ project_id }} ip link set dev xfrm{{ vpn['stif_number'] }} up
+
+{# VPN Route Configuration #}
+{% for route in vpn['routes'] %}
+sudo ip netns exec P{{ project_id }} ip route add {{ route['remote'] }} dev xfrm{{ vpn['stif_number'] }}
+{% endfor %}
+{% endfor %}
+
+{# Apply VPNs #}
+sudo mv {{ temp_vpn_filename }} {{ vpn_filename }}
+sudo swanctl -q
+{# Initiate the VPN connection #}
+{% for vpn in vpns %}
+sudo swanctl -i -c {{ project_id }}-{{ vpn['stif_number'] }}
+{% endfor %}
+{% endif %}
+{# ------------------------------------------------------------------------------------------------------------- #}

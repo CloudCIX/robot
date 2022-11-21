@@ -1,0 +1,22 @@
+{# Scrub Snapshot #}
+function SnapshotDoesNotExist{
+    $snapshot = Get-VMSnapshot -VMName $vm_name -Name $snapshot_name -ea SilentlyContinue
+    if ($snapshot) {
+        return $false
+    }
+    return $true
+}
+
+$snapshot_name = "{{ snapshot_identifier }}"
+$vm_name = "{{ vm_identifier }}"
+$remove_subtree = ${{ remove_subtree }}
+$warning_message = "Attempted to remove Snapshot $($snapshot_name) but Snapshot $($snapshot_name) does not exist on a vm called $($vm_name)."
+if (SnapshotDoesNotExist){
+    Write-Warning $warning_message
+}
+if ($remove_subtree){
+    Remove-VMSnapshot -VMName $vm_name -Name $snapshot_name -IncludeAllChildSnapshots
+} else{
+    Remove-VMSnapshot -VMName $vm_name -Name $snapshot_name
+}
+Write-Output "Ran scrub command"

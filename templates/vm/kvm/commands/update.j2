@@ -1,0 +1,58 @@
+{
+  {# 1. Shutdown the VM if it isn't already, and wait for it to shut down #}
+  echo '{{ host_sudo_passwd }}' | sudo -S virsh shutdown {{ vm_identifier }}
+  while virsh list --all | grep '{{ vm_identifier }}' | grep 'running'; do
+    sleep 1
+  done
+
+  {# 2. Update the RAM #}
+  {% if changes['ram'] %}
+  {# 2a. Maximum #}
+  echo '{{ host_sudo_passwd }} '| sudo -S virsh setmaxmem {{ vm_identifier }} {{ changes['ram'] }}M --config
+  {# 2b. Current #}
+  echo '{{ host_sudo_passwd }}' | sudo -S virsh setmem {{ vm_identifier }} {{ changes['ram'] }}M --config
+  {% endif %}
+
+  {# 3. Update the vCPU values #}
+  {% if changes['cpu'] %}
+  {# 3a. Maximum #}
+  echo '{{ host_sudo_passwd }}' | sudo -S virsh setvcpus {{ vm_identifier }} --maximum {{ changes['cpu'] }} --config
+  {# 3b. Current #}
+  echo '{{ host_sudo_passwd }}' | sudo -S virsh setvcpus {{ vm_identifier }} --count {{ changes['cpu'] }} --config
+  {% endif %}
+
+  {# 4. Update IP Configurations #}
+  {# TODO #}
+
+  {# 5 Drive changes #}
+  {% if changes['storages'] %}
+  {% set drives = changes['storages'] %}
+  {% set number = 0 %}
+
+  {# 5a. Update Drive Sizes #}
+  {% for drive in drives %}
+    {% if int(drive['new_size']) > int(drive['old_size']) %}
+      {# Expand the Drive #}
+      {% set diff = int(drive['new_size']) - int(drive['old_size']) %}
+      echo '{{ host_sudo_passwd }}' | sudo -S qemu-img resize {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ drive['id'] }}.img +{{ diff }}G
+    {% elif int(drive['new_size']) == 0 %}
+      {# Delete the Drive #}
+      echo '{{ host_sudo_passwd }}' | sudo -S rm -rf {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ drive['id'] }}.img
+      {% elif drive['old_size'] is in ['0', None, ''] %}
+      {# Create a new Drive #}
+      {% set number = number + 1 %}
+      echo '{{ host_sudo_passwd }}' | sudo -S qemu-img create -f qcow2 {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ drive['id'] }}.img {{ drive['new_size'] }}G
+    {% endif %}
+  {% endfor %}
+
+  {# 5b. Generate correct names for the new drives to mount them to the VM #}
+  {% set drive_point = 96 + total_drives - number %}
+  {% for drive in drives if drive['old_size'] is in ['0', None, ''] %}
+    {% set alphabet = chr(drive_point + (loop.index0 + 1)) %}
+    echo '{{ host_sudo_passwd }}' | sudo -S virsh attach-disk {{ vm_identifier }} \
+    --source {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ drive['id'] }}.img \
+    --target vd{{ alphabet }}
+  {% endfor %}
+
+  {% endif %}
+}

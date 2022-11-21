@@ -1,0 +1,9 @@
+{
+{% for vlan in vlans %}
+  {# 1. Place the bridge vlan defination file at /etc/netplan/ in the host  #}
+  {# Note: yaml file name must start with numbers, so striping `br`  #}
+  echo '{{ host_sudo_passwd }}' | sudo -S cp {{ network_drive_path }}/VMs/{{ vm_identifier }}/br{{ vlan }}.yaml /etc/netplan/{{ vlan }}.yaml
+{% endfor %}
+  {# 2. Apply netplan changes to bring up all vlan bridges at once #}
+  echo '{{ host_sudo_passwd }}' | sudo -S netplan apply
+}

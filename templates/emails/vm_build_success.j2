@@ -1,0 +1,20 @@
+{% extends "emails/base.j2" %}
+
+{% block title %}Your VM "{{ name }}" has been successfully built!{% endblock %}
+
+{% block content %}
+<p>Your credentials are provided below.</p>
+<hr />
+<table role="presentation" border="0" cellpadding="0" cellspacing="0">
+  <tbody>
+    <tr class="credentials">
+      <th>Username: administrator</th>
+      <th>Password: {{ admin_password }}</th>
+    </tr>
+  </tbody>
+</table>
+<hr />
+<p>Log on to the <a href="{{ compute_url }}/view/vm/{{ id }}/">CloudCIX Compute App</a> to retrieve the IP Addresses for the VM in order to log in.</p>
+<p>We recommend you update your password once you log in to improve security.</p>
+<p>If you requested more than one Storage drive in this VM, please note that any extra drives need to be manually formatted and mounted.</p>
+{% endblock %}

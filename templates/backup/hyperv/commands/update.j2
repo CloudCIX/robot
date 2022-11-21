@@ -1,0 +1,3 @@
+{# Update Snapshot #}
+Restore-VMCheckpoint -Name {{ snapshot_identifier }} -VMName {{ vm_identifier }} -Confirm:$false
+Write-Output "Ran update command"

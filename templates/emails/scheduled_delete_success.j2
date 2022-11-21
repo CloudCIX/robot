@@ -1,0 +1,17 @@
+{% extends "emails/base.j2" %}
+
+{% block title %}Your VM "{{ name }}" has been scheduled for deletion.{% endblock %}
+
+{% block content %}
+<p>This VM will be deleted on;</p>
+<hr />
+<table role="presentation" border="0" cellpadding="0" cellspacing="0">
+  <tbody>
+    <tr>
+      <th>{{ deletion_date }}</th>
+    </tr>
+  </tbody>
+</table>
+<hr />
+<p>You can restore the VM from the <a href="{{ compute_url }}">CloudCIX Compute App</a> at any time before this date.</p>
+{% endblock %}

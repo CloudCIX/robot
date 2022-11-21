@@ -1,0 +1,12 @@
+{
+{# 1. First shutdown the VM #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh shutdown {{ vm_identifier }}
+
+{# 2. Delete the VM instance #}
+echo '{{ host_sudo_passwd }}' | sudo -S virsh undefine {{ vm_identifier }}
+
+{# 3. Delete all of the drives #}
+{% for storage in storages %}
+echo '{{ host_sudo_passwd }}' | sudo -S rm -rf {{ vms_path }}{{ vm_identifier }}_{{ storage_type }}_{{ storage["id"] }}.img
+{% endfor %}
+}

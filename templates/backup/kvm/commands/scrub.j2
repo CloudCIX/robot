@@ -1,0 +1,8 @@
+{# Scrub Backup #}
+export_path='{{ export_path}}'
+echo '{{ host_sudo_passwd }}' | sudo -S rm -r $export_path
+
+if ! [ -d $export_path ]
+then
+    echo "Backup directory removed"
+fi

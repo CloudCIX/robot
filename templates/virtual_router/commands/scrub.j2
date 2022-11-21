@@ -1,0 +1,12 @@
+{# Delete the Project namespace #}
+sudo ip netns del P{{ project_id }}
+{# vlan bridges are built on master namespace so should be deleted directly #}
+{# If vlan bridge exists then it will be deleted, Warnings are expected if vlan bridge doesn't exist, it is ignored #}
+{% for vlan in vlans %}
+sudo ip link del br-B{{ vlan['vlan'] }}
+sudo ip link del {{ private_interface }}.{{ vlan['vlan'] }}
+{% endfor %}
+{# If VPNs exists then terminate each vpn, Warnings are expected if vpn doesn't exists, it is ignored #}
+{% for vpn in vpns %}
+sudo swanctl -t -c {{ project_id }}-{{ vpn['stif_number'] }}
+{% endfor %}

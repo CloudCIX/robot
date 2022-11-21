@@ -1,0 +1,61 @@
+connections {
+{% for vpn in vpns %}
+
+{# Section for an IKE connection named <conn> #}
+    {{ project_id }}-{{ vpn['stif_number'] }} {
+
+{# IKE major version to use for connection. #}
+        version = {{ vpn['version'] }}
+        aggressive = {{ vpn['aggressive'] }}
+        proposals = {{ vpn['ike_encryption_map'] }}-{{ vpn['ike_authentication_map'] }}-{{ vpn['ike_dh_groups_map'] }}
+        over_time = {{ vpn['ike_lifetime'] }}s
+
+{# Local address(es) to use for IKE communication, comma separated. #}
+        local_addrs = {{ podnet_cpe }}
+{# Remote address(es) to use for IKE communication, comma separated. #}
+        remote_addrs = {{ vpn['ike_gateway_value'] }}
+{# Default inbound XFRM interface ID for children. #}
+        if_id_in = {{ vpn['stif_number'] }}
+{# Default outbound XFRM interface ID for children. #}
+        if_id_out = {{ vpn['stif_number'] }}
+
+{# Section for a local authentication round. #}
+        local {
+            auth = psk
+            id = {{ podnet_cpe }}
+        }
+{# Section for a remote authentication round. #}
+        remote {
+            auth = psk
+            id = {{ vpn['ike_gateway_value'] }}
+        }
+
+{# CHILD_SA configuration sub-section. #}
+        children {
+            {{ project_id }}-{{ vpn['stif_number'] }} {
+                life_time = {{ vpn['ipsec_lifetime'] }}s
+{# Local traffic selectors to include in CHILD_SA. #}
+                local_ts = {{ vpn['local_ts'] }}
+                esp_proposals = {{ vpn['ipsec_encryption_map'] }}-{{ vpn['ipsec_authentication_map'] }}-{{ vpn['ipsec_pfs_groups_map'] }}
+{# Remote selectors to include in CHILD_SA. #}
+                remote_ts = {{ vpn['remote_ts'] }}
+{# Inbound XFRM interface ID. #}
+                if_id_in = {{ vpn['stif_number'] }}
+{# Outbound XFRM interface ID. #}
+                if_id_out = {{ vpn['stif_number'] }}
+            }
+        }
+    }
+{% endfor %}
+}
+
+secrets {
+{% for vpn in vpns %}
+    ike{{ vpn['stif_number'] }} {
+{# Value of the IKE preshared secret. #}
+        secret = {{ vpn['ike_pre_shared_key'] }}
+{# IKE identity the IKE preshared secret belongs to. #}
+        id = {{ vpn['ike_gateway_value'] }}
+    }
+{% endfor %}
+}
