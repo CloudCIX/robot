@@ -20,7 +20,7 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASSWORD', 'email_pw')
 EMAIL_PORT = os.getenv('EMAIL_PORT', 25)
 EMAIL_REPLY_TO = os.getenv('EMAIL_REPLY_TO', 'no-reply@example.com')
 
-MGMT_IP = os.getenv('ROUTER_MGMT_IP', '2a02:2078:3::10:0:1')
+MGMT_IP = os.getenv('ROUTER_MGMT_IP', 'xxxx:xxxx:xxxx::10:0:1')
 NETWORK_PASSWORD = os.getenv('NETWORK_PASSWORD', 'ntw_pw')
 
 PAM_NAME = os.getenv('PAM_NAME', 'pam')
